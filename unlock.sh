@@ -75,28 +75,29 @@ if [ "$USER_COUNT" -eq 1 ]; then
     -t -A -c 'SELECT id FROM "user" LIMIT 1;' 2>/dev/null | tr -d ' ')
   echo "  Only 1 user found. Unlocking automatically..."
 else
-  echo -n "  Enter user ID to unlock (copy from list above): "
+  echo -n "  Enter user ID to unlock (press Enter to unlock ALL users): "
   read -r TARGET_ID
-fi
-
-if [ -z "$TARGET_ID" ]; then
-  echo -e "${RED}✗ No user ID provided.${NC}"
-  exit 1
 fi
 
 # ── 5. Unlock ──────────────────────────────────────────
 echo ""
-echo "  🔓 Unlocking user $TARGET_ID ..."
-
-docker exec "$POSTGRES_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" \
-  -c "UPDATE \"user\" SET \"enableEnterpriseFeatures\" = true, \"isValidEnterpriseLicense\" = true, \"licenseKey\" = NULL WHERE id = '$TARGET_ID';" \
-  2>/dev/null
+if [ -z "$TARGET_ID" ]; then
+  echo "  🔓 Unlocking ALL users ..."
+  docker exec "$POSTGRES_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" \
+    -c "UPDATE \"user\" SET \"enableEnterpriseFeatures\" = true, \"isValidEnterpriseLicense\" = true, \"licenseKey\" = NULL WHERE \"enableEnterpriseFeatures\" = false OR \"isValidEnterpriseLicense\" = false OR \"enableEnterpriseFeatures\" IS NULL OR \"isValidEnterpriseLicense\" IS NULL;" \
+    2>/dev/null
+else
+  echo "  🔓 Unlocking user $TARGET_ID ..."
+  docker exec "$POSTGRES_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" \
+    -c "UPDATE \"user\" SET \"enableEnterpriseFeatures\" = true, \"isValidEnterpriseLicense\" = true, \"licenseKey\" = NULL WHERE id = '$TARGET_ID';" \
+    2>/dev/null
+fi
 
 # ── 6. Verify ──────────────────────────────────────────
 echo ""
 echo "  ✅ Verification:"
 docker exec "$POSTGRES_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" \
-  -c "SELECT id, email, \"enableEnterpriseFeatures\", \"isValidEnterpriseLicense\", \"licenseKey\" FROM \"user\" WHERE id = '$TARGET_ID';" \
+  -c "SELECT id, email, \"enableEnterpriseFeatures\", \"isValidEnterpriseLicense\", \"licenseKey\" FROM \"user\";" \
   2>/dev/null
 
 echo ""
